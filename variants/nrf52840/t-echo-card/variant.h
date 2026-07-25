@@ -108,21 +108,27 @@ static const uint8_t A0 = PIN_A0;
 // with SSD1306, so USE_SSD1306 initializes the controller correctly.
 //
 // Viewport: the physical panel is 72×40, mapped into the SSD1315's 128×64
-// GDDRAM at columns 28..99, pages 3..7 (rows 24..63). The firmware handles
-// this by:
+// GDDRAM at columns 28..99, pages 0..4 (rows 0..39) -- confirmed empirically
+// on-device with a page/offset test pattern; earlier revisions of this file
+// assumed pages 3..7, which pushed every write past the visible window. The
+// panel is also wired with reversed SEG/COM direction relative to the
+// controller's power-on default, so the image needs a 180-degree rotation
+// (Screen.cpp calls flipScreenVertically() for this geometry) or everything
+// renders upside down. The firmware handles this by:
 //   * asking the library for GEOMETRY_72_40, which sets the framebuffer to
 //     72×40 and emits the right SETMULTIPLEX (39) / SETCOMPINS at init;
 //   * relying on SSD1306Wire's built-in horizontal auto-centering
 //     ((128 - width) / 2 = 28), so no horizontal shim is needed;
-//   * calling SSD1306Wire::setYOffset(3) in Screen.cpp when
-//     OLED_Y_OFFSET_PAGES is defined — this shifts every PAGEADDR write by
-//     three pages (24 rows) so data lands on the visible rows.
+//   * leaving OLED_Y_OFFSET_PAGES at 0 (the visible window starts at page 0,
+//     so no PAGEADDR shift is needed).
 // ───────────────────────────────────────────────────────────────────────────
 #define HAS_SCREEN 1
 #define USE_SSD1306
 #define OLED_GEOMETRY_OVERRIDE GEOMETRY_72_40
-#define OLED_Y_OFFSET_PAGES 3
+#define OLED_Y_OFFSET_PAGES 0
 #define OLED_TINY
+// Keep the UI compact on this low-res panel so text stays readable.
+#define DISPLAY_FORCE_SMALL_FONTS
 
 // Controls power 3V3 for all peripherals (GPS + LoRa + Sensor)
 #define PIN_POWER_EN (0 + 30) // RT9080_EN

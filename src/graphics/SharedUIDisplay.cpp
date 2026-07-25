@@ -100,16 +100,24 @@ void drawCommonHeader(OLEDDisplay *display, int16_t x, int16_t y, const char *ti
     display->setTextAlignment(TEXT_ALIGN_LEFT);
 
     const int xOffset = 4;
+    const int screenW = display->getWidth();
+    const int screenH = display->getHeight();
+    const bool isCompactPanel = graphics::isCompactPanel(display);
+    // Only used by the non-compact highlight-box branches below; compact
+    // panels skip that box entirely (see isCompactPanel branch further down).
     const int highlightHeight = FONT_HEIGHT_SMALL - 1;
     const bool isInverted = (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_INVERTED);
     const bool isBold = config.display.heading_bold;
 
-    const int screenW = display->getWidth();
-    const int screenH = display->getHeight();
-
     if (!force_no_invert) {
         // === Inverted Header Background ===
-        if (isInverted) {
+        if (isCompactPanel) {
+            // No highlight box tall enough to hold a full text row fits here
+            // without either clipping the title or eating into body/nav-bar
+            // space; skip the background entirely and draw the title in
+            // white directly on the (already black) screen background.
+            display->setColor(WHITE);
+        } else if (isInverted) {
             display->setColor(BLACK);
             display->fillRect(0, 0, screenW, highlightHeight + 2);
             display->setColor(WHITE);
@@ -157,7 +165,7 @@ void drawCommonHeader(OLEDDisplay *display, int16_t x, int16_t y, const char *ti
 #endif
 
     bool useHorizontalBattery = (currentResolution == ScreenResolution::High && screenW >= screenH);
-    const int textY = y + (highlightHeight - FONT_HEIGHT_SMALL) / 2;
+    const int textY = y + (isCompactPanel ? 1 : ((highlightHeight >= FONT_HEIGHT_SMALL) ? ((highlightHeight - FONT_HEIGHT_SMALL) / 2) : 0));
 
     int batteryX = 1;
     int batteryY = HEADER_OFFSET_Y + 1;
@@ -403,11 +411,40 @@ void drawCommonHeader(OLEDDisplay *display, int16_t x, int16_t y, const char *ti
     display->setColor(WHITE); // Reset for other UI
 }
 
+bool isCompactPanel(OLEDDisplay *display)
+{
+    return (display->getHeight() <= 40) || (display->getWidth() <= 80);
+}
+
+int getCompactPanelLineY(OLEDDisplay *display, int lineIndex)
+{
+    (void)display;
+    // With no background box, only the header text's cap-height actually
+    // shows any ink (these titles - Home/LoRa/Position/System - have no
+    // descenders); let the first content row start right under that rather
+    // than under the font's full nominal height, to reclaim body space.
+    const int headerSpace = 10;
+    // Matches the textFirstLine/textSecondLine spacing convention used for
+    // normal-resolution screens elsewhere in this file (FONT_HEIGHT_SMALL - 5).
+    // A height-divided step here undercounted badly: at FONT_HEIGHT_SMALL≈13
+    // any step under ~8px makes consecutive lines overlap.
+    const int step = FONT_HEIGHT_SMALL - 5;
+    // Callers on this panel (drawDeviceFocused, drawLoRaFocused) start
+    // their row counter at line=1, not 0 -- treat index 1 as "right after
+    // the header" instead of leaving a whole blank row at the top.
+    const int adjustedIndex = (lineIndex > 0) ? lineIndex - 1 : 0;
+    return headerSpace + (adjustedIndex * step);
+}
+
 const int *getTextPositions(OLEDDisplay *display)
 {
     static int textPositions[7]; // Static array that persists beyond function scope
 
-    if (currentResolution == ScreenResolution::High) {
+    if (isCompactPanel(display)) {
+        for (int i = 0; i < 7; ++i) {
+            textPositions[i] = getCompactPanelLineY(display, i);
+        }
+    } else if (currentResolution == ScreenResolution::High) {
         textPositions[0] = textZeroLine;
         textPositions[1] = textFirstLine_medium;
         textPositions[2] = textSecondLine_medium;

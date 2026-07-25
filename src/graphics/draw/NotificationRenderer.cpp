@@ -581,16 +581,13 @@ void NotificationRenderer::drawNotificationBox(OLEDDisplay *display, OLEDDisplay
     int16_t boxTop = (display->height() / 2) - (boxHeight / 2);
     boxHeight += (currentResolution == ScreenResolution::High) ? 2 : 1;
 #if defined(OLED_TINY)
-    if (visibleTotalLines == 1) {
-        boxTop += 25;
-    }
-    if (alertBannerOptions < 3) {
-        int missingLines = 3 - alertBannerOptions;
-        int moveUp = missingLines * (effectiveLineHeight / 2);
-        boxTop -= moveUp;
-        if (boxTop < 0)
-            boxTop = 0;
-    }
+    // On a panel this small, a floating centered box always leaves part of
+    // the screen showing whatever frame is behind the overlay. Just take
+    // over the whole screen instead of trying to size/center the box.
+    boxLeft = 0;
+    boxTop = 0;
+    boxWidth = display->width();
+    boxHeight = display->height();
 #endif
 
     // Draw Box

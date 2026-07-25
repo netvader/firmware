@@ -754,6 +754,9 @@ void UIRenderer::drawDeviceFocused(OLEDDisplay *display, OLEDDisplayUiState *sta
 
     // === Content below header ===
 
+    const bool compactPanel = graphics::isCompactPanel(display);
+    const int baseLine = compactPanel ? 1 : 0;
+
     // Determine if we need to show 4 or 5 rows on the screen
     int rows = 4;
     if (!config.bluetooth.enabled) {
@@ -796,7 +799,7 @@ void UIRenderer::drawDeviceFocused(OLEDDisplay *display, OLEDDisplayUiState *sta
 #endif
 
 #if defined(OLED_TINY)
-    line += 1;
+    line += 1; // otherwise this draws on top of the GPS/satellite row above
 
     // === Node Identity ===
     int textWidth = 0;
@@ -898,9 +901,12 @@ void UIRenderer::drawDeviceFocused(OLEDDisplay *display, OLEDDisplayUiState *sta
     line += 1;
 
     // === Fourth & Fifth Rows: Node Identity ===
+    if (compactPanel) {
+        line = std::max(1, baseLine + 1);
+    }
     int textWidth = 0;
     int nameX = 0;
-    int yOffset = (currentResolution == ScreenResolution::High) ? 0 : 5;
+    int yOffset = (currentResolution == ScreenResolution::High) ? 0 : 1;
     const char *longName = (ourNode && ourNode->has_user && ourNode->user.long_name[0]) ? ourNode->user.long_name : "";
     const char *shortName = owner.short_name ? owner.short_name : "";
     char combinedName[96];
@@ -1489,15 +1495,19 @@ void UIRenderer::drawNavigationBar(OLEDDisplay *display, OLEDDisplayUiState *sta
 #endif
 
     // Pre-calculate bounding rect
+    const bool isCompactPanel = graphics::isCompactPanel(display);
+    const int rectTopPad = isCompactPanel ? 1 : 2;
     const int rectX = xStart - 2 - bigOffset;
     const int rectWidth = totalWidth + 4 + (bigOffset * 2);
-    const int rectHeight = iconSize + 6;
+    // On a 40px-tall panel the full +6 padding pushes this border past the
+    // bottom edge; keep it snug around the icons instead.
+    const int rectHeight = iconSize + (isCompactPanel ? 2 : 6);
 
     // Clear background and draw border
     display->setColor(BLACK);
-    display->fillRect(rectX + 1, y - 2, rectWidth - 2, rectHeight - 2);
+    display->fillRect(rectX + 1, y - rectTopPad, rectWidth - 2, rectHeight - 2);
     display->setColor(WHITE);
-    display->drawRect(rectX, y - 2, rectWidth, rectHeight);
+    display->drawRect(rectX, y - rectTopPad, rectWidth, rectHeight);
 
     // Icon drawing loop for the current page
     for (size_t i = pageStart; i < pageEnd; ++i) {

@@ -57,6 +57,8 @@ void drawCommonHeader(OLEDDisplay *display, int16_t x, int16_t y, const char *ti
 // Shared battery/time/mail header
 void drawCommonFooter(OLEDDisplay *display, int16_t x, int16_t y);
 
+bool isCompactPanel(OLEDDisplay *display);
+int getCompactPanelLineY(OLEDDisplay *display, int lineIndex);
 const int *getTextPositions(OLEDDisplay *display);
 
 bool isAllowedPunctuation(char c);

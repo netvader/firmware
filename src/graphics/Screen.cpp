@@ -431,11 +431,16 @@ Screen::Screen(ScanI2C::DeviceAddress address, meshtastic_Config_DisplayConfig_O
 #endif
 #elif defined(USE_SSD1306)
     dispdev = new SSD1306Wire(address.address, -1, -1, geometry,
-                              (address.port == ScanI2C::I2CPort::WIRE1) ? HW_I2C::I2C_TWO : HW_I2C::I2C_ONE);
+                              (address.port == ScanI2C::I2CPort::WIRE1) ? HW_I2C::I2C_TWO : HW_I2C::I2C_ONE,
+                              (geometry == GEOMETRY_72_40) ? 100000 : SSD1306_WIRE_I2C_FREQUENCY);
 #if defined(OLED_Y_OFFSET_PAGES)
     // Panels whose active window does not start at GDDRAM row 0 (e.g. 72x40
     // modules on pages 3..7) need a fixed vertical page shift on every write.
     static_cast<SSD1306Wire *>(dispdev)->setYOffset(OLED_Y_OFFSET_PAGES);
+#endif
+#if defined(OLED_GEOMETRY_OVERRIDE)
+    static_cast<SSD1306Wire *>(dispdev)->setGeometry(GEOMETRY_72_40, 72, 40);
+    static_cast<SSD1306Wire *>(dispdev)->setBrightness(255);
 #endif
 #elif defined(USE_SPISSD1306)
     dispdev = new SSD1306Spi(SSD1306_RESET, SSD1306_RS, SSD1306_NSS, GEOMETRY_64_48);
@@ -682,6 +687,16 @@ void Screen::setup()
 
     // Initialize display and UI system
     ui->init();
+#if defined(OLED_GEOMETRY_OVERRIDE) && defined(USE_SSD1306)
+    // This panel is wired with reversed SEG/COM direction relative to the
+    // controller default -- confirmed on-device, the image renders fully
+    // upside down without this. sendInitCommands() (called from ui->init()
+    // above) always sets the power-on-default direction, so this has to run
+    // after init(), not before.
+    if (geometry == GEOMETRY_72_40) {
+        dispdev->flipScreenVertically();
+    }
+#endif
     displayWidth = dispdev->width();
     displayHeight = dispdev->height();
 
@@ -1233,8 +1248,15 @@ void Screen::setFrames(FrameFocus focus)
 #if !defined(DISPLAY_CLOCK_FRAME)
     if (!hiddenFrames.clock) {
         fsi.positions.clock = numframes;
+#if defined(OLED_TINY)
+        // The analog face's tick marks/hour numbers don't fit a 72x40-class
+        // panel and render as scattered noise; the digital face self-scales
+        // to the available width/height and stays legible.
+        normalFrames[numframes++] = graphics::ClockRenderer::drawDigitalClockFrame;
+#else
         normalFrames[numframes++] = uiconfig.is_clockface_analog ? graphics::ClockRenderer::drawAnalogClockFrame
                                                                  : graphics::ClockRenderer::drawDigitalClockFrame;
+#endif
         indicatorIcons.push_back(digital_icon_clock);
     }
 #endif
