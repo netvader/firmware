@@ -419,8 +419,29 @@ bool NRF52Bluetooth::onPairingPasskey(uint16_t conn_handle, uint8_t const passke
             char btPIN[16] = "888888";
             snprintf(btPIN, sizeof(btPIN), "%06u", configuredPasskey);
             int x_offset = display->width() / 2;
-            int y_offset = display->height() <= 80 ? 0 : 12;
             display->setTextAlignment(TEXT_ALIGN_CENTER);
+
+#if defined(OLED_TINY)
+            // Unlike the ESP32/NimBLE passkey screen, this one had no
+            // OLED_TINY handling at all: on a 40px-tall panel "Enter this
+            // code" alone pushed the PIN itself past the bottom edge, and
+            // the device name fully off-screen. All fonts already collapse
+            // to one size here, so just stack title/PIN/name at that size's
+            // actual line height instead of the normal screen's spacing.
+            display->setFont(FONT_MEDIUM);
+            display->drawString(x_offset + x, y, "Bluetooth");
+
+            String displayPin(btPIN);
+            String pin = displayPin.substring(0, 3) + " " + displayPin.substring(3, 6);
+            display->setFont(FONT_LARGE);
+            display->drawString(x_offset + x, y + FONT_HEIGHT_MEDIUM, pin);
+
+            display->setFont(FONT_SMALL);
+            String deviceName = "Name: ";
+            deviceName.concat(getDeviceName());
+            display->drawString(x_offset + x, y + FONT_HEIGHT_MEDIUM + FONT_HEIGHT_LARGE, deviceName);
+#else
+            int y_offset = display->height() <= 80 ? 0 : 12;
             display->setFont(FONT_MEDIUM);
             display->drawString(x_offset + x, y_offset + y, "Bluetooth");
 
@@ -439,6 +460,7 @@ bool NRF52Bluetooth::onPairingPasskey(uint16_t conn_handle, uint8_t const passke
             deviceName.concat(getDeviceName());
             y_offset = display->height() == 64 ? y_offset + FONT_HEIGHT_LARGE - 6 : y_offset + FONT_HEIGHT_LARGE + 5;
             display->drawString(x_offset + x, y_offset + y, deviceName);
+#endif
         });
     }
 #endif

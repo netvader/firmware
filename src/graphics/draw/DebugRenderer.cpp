@@ -629,10 +629,17 @@ void drawSystemScreen(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x
 
     display->setTextAlignment(TEXT_ALIGN_LEFT);
     // System Uptime
+#if !defined(OLED_TINY)
     if (line < 2) {
         line += 1;
     }
     line += 1;
+#else
+    // The double-increment above is a visual gap that other screens can
+    // spare; a 40px-tall panel can't -- it pushed the API-state row (below)
+    // past the bottom edge entirely. Advance by one row instead of two.
+    line += 1;
+#endif
 
     char appversionstr[35];
     char appversionstr_formatted[40];

@@ -1232,6 +1232,7 @@ void UIRenderer::drawCompassAndLocationScreen(OLEDDisplay *display, OLEDDisplayU
 
     // If GPS is off, no need to display these parts
     if (strcmp(displayLine, "GPS off") != 0 && strcmp(displayLine, "No GPS") != 0) {
+#if !defined(OLED_TINY)
         // === Second Row: Last GPS Fix ===
         if (gpsStatus->getLastFixMillis() > 0) {
             uint32_t delta = millis() - gpsStatus->getLastFixMillis();
@@ -1248,17 +1249,23 @@ void UIRenderer::drawCompassAndLocationScreen(OLEDDisplay *display, OLEDDisplayU
         } else {
             display->drawString(0, textPos[line++], "Last: ?");
         }
+#endif
 
         // === Third Row: Line 1 GPS Info ===
         UIRenderer::drawGpsCoordinates(display, x, textPos[line++], gpsStatus, "line1");
 
+#if !defined(OLED_TINY)
         if (uiconfig.gps_format != meshtastic_DeviceUIConfig_GpsCoordinateFormat_OLC &&
             uiconfig.gps_format != meshtastic_DeviceUIConfig_GpsCoordinateFormat_MLS) {
             // === Fourth Row: Line 2 GPS Info ===
             UIRenderer::drawGpsCoordinates(display, x, textPos[line++], gpsStatus, "line2");
         }
+#endif
 
         // === Final Row: Altitude ===
+        // On OLED_TINY this ends up as the third (and last) visible row --
+        // Last Fix and Line 2 above are skipped so this doesn't run past
+        // the bottom of a 40px-tall panel.
         char altitudeLine[32] = {0};
         int32_t alt = geoCoord.getAltitude();
         if (config.display.units == meshtastic_Config_DisplayConfig_DisplayUnits_IMPERIAL) {

@@ -191,6 +191,15 @@ void drawDigitalClockFrame(OLEDDisplay *display, OLEDDisplayUiState *state, int1
         float max_scale = 3.5f; // Safety limit to avoid runaway scaling
         float step = 0.05f;     // Step increment per iteration
 
+#if defined(OLED_TINY)
+        // The loop below only searches upward from the current `scale` and
+        // gives up (backing off by a single `step`) as soon as it's already
+        // too big; the static default of 0.75 already overflows the ~7px
+        // height budget this geometry works out to below, by 4x. Start the
+        // search from something that can actually still grow into it.
+        scale = 0.1f;
+#endif
+
         float target_width = display->getWidth() * screenwidth_target_ratio;
         float target_height =
             display->getHeight() -
