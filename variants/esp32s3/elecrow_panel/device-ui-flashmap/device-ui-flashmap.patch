@@ -1,0 +1,81 @@
+--- a/include/graphics/map/MapFileSystem.h
++++ b/include/graphics/map/MapFileSystem.h
+@@ -76,3 +76,30 @@
+ };
+ 
+ #endif
++
++#if defined(MAP_FROM_FLASH)
++#include "esp_partition.h"
++
++/**
++ * Reads the PMTiles archive straight from the raw data partition labelled "maps" (no file system involved)
++ */
++class FlashMapFileSystem : public IMapFileSystem
++{
++  public:
++    bool open(const char *path) override
++    {
++        part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, (esp_partition_subtype_t)0x40, "maps");
++        return part != nullptr;
++    }
++    void close(void) override {}
++    bool readAt(uint64_t offset, uint8_t *buf, uint32_t len) override
++    {
++        if (!part || offset + len > part->size)
++            return false;
++        return esp_partition_read(part, (size_t)offset, buf, len) == ESP_OK;
++    }
++
++  private:
++    const esp_partition_t *part = nullptr;
++};
++#endif
+--- a/source/graphics/TFT/TFTView_320x240.cpp
++++ b/source/graphics/TFT/TFTView_320x240.cpp
+@@ -2839,7 +2839,10 @@
+ void TFTView_320x240::loadMap(void)
+ {
+     if (!map) {
+-#if LV_USE_FS_ARDUINO_SD
++#if defined(MAP_FROM_FLASH)
++        // tiles live in a raw "maps" flash partition (single PMTiles archive), no SD card needed
++        map = new MapPanel(objects.raw_map_panel, new PMTileService(nullptr, new FlashMapFileSystem()));
++#elif LV_USE_FS_ARDUINO_SD
+         map = new MapPanel(objects.raw_map_panel);
+ #elif defined(SENSECAP_INDICATOR)
+         // tiles live on the SD card behind the RP2040, fetched chunk-wise over the interdevice link
+@@ -2940,6 +2943,16 @@
+             map->setZoom(3);
+         }
+ 
++#if defined(MAP_FROM_FLASH) && defined(MAP_START_LAT) && defined(MAP_START_LON)
++        // offline flash map: always start centered on a fixed location (see -D MAP_START_*)
++#ifndef MAP_START_ZOOM
++#define MAP_START_ZOOM 11
++#endif
++        MapTileSettings::setDefaultZoom(MAP_START_ZOOM);
++        map->setHomeLocation(MAP_START_LAT, MAP_START_LON);
++        map->setZoom(MAP_START_ZOOM);
++        map->moveHome();
++#endif
+         if (db.uiConfig.map_data.follow_gps) {
+             lv_obj_set_state(objects.gps_lock_button, LV_STATE_CHECKED, true);
+             map->setLocked(true);
+@@ -3039,6 +3052,16 @@
+         lv_dropdown_clear_options(objects.map_url_dropdown);
+     }
+ 
++#if defined(MAP_FROM_FLASH)
++    map->setNoTileImage(&img_no_tile_image);
++    MapTileSettings::setPrefix("/maps");
++    MapTileSettings::setTileStyle("flash");
++    MapTileSettings::setPMTiles(true);
++    MapTileSettings::setSaveOK(false);
++    lv_obj_add_flag(objects.map_style_dropdown, LV_OBJ_FLAG_HIDDEN);
++    lv_obj_add_flag(objects.map_url_dropdown, LV_OBJ_FLAG_HIDDEN);
++    map->forceRedraw();
++#endif
+     MapTileSettings::setUniqueId(ownNode);
+ 
+     lv_obj_clear_flag(objects.map_panel, LV_OBJ_FLAG_HIDDEN);
